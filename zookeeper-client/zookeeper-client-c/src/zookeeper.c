@@ -1346,7 +1346,7 @@ static zhandle_t *zookeeper_init_internal(const char *host, watcher_fn watcher,
     zh->hostname = NULL;
     zh->state = ZOO_NOTCONNECTED_STATE;
     zh->context = context;
-    zh->recv_timeout = recv_timeout;
+    zh->recv_timeout = recv_timeout;   // 赋值
     zh->allow_read_only = flags & ZOO_READONLY;
     // non-zero clientid implies we've seen r/w server already
     zh->seen_rw_server_before = (clientid != 0 && clientid->client_id != 0);
@@ -2257,7 +2257,7 @@ static int deserialize_prime_response(struct prime_struct *resp, char* buffer)
      return 0;
 }
 
-static int prime_connection(zhandle_t *zh)
+static int prime_connection(zhandle_t *zh)  // 设置了超时 初始话连接
 {
     int rc;
     /*this is the size of buffer to serialize req into*/
@@ -2941,7 +2941,7 @@ static int process_sasl_response(zhandle_t *zh, char *buffer, int len)
 
 #endif /* HAVE_CYRUS_SASL_H */
 
-static int check_events(zhandle_t *zh, int events)
+static int check_events(zhandle_t *zh, int events)  // ?
 {
     if (zh->fd->sock == -1)
         return ZINVALIDSTATE;
@@ -2990,7 +2990,7 @@ static int check_events(zhandle_t *zh, int events)
 
     if (zh->to_send.head && (events&ZOOKEEPER_WRITE)) {
         /* make the flush call non-blocking by specifying a 0 timeout */
-        int rc=flush_send_queue(zh,0);
+        int rc=flush_send_queue(zh,0);  // 没有处理发送的请求已经超时的情况
         if (rc < 0)
             return handle_socket_error_msg(zh, __LINE__, __func__, ZCONNECTIONLOSS,
                 "failed while flushing send queue");
@@ -3007,10 +3007,10 @@ static int check_events(zhandle_t *zh, int events)
                 "failed while receiving a server response");
         }
         if (rc > 0) {
-            get_system_time(&zh->last_recv);
+            get_system_time(&zh->last_recv);  // 
             if (zh->input_buffer != &zh->primer_buffer) {
                 if (is_connected(zh) || !is_sasl_auth_in_progress(zh)) {
-                    queue_buffer(&zh->to_process, zh->input_buffer, 0);
+                    queue_buffer(&zh->to_process, zh->input_buffer, 0);   // 取出来放到to_process
 #ifdef HAVE_CYRUS_SASL_H
                 } else {
                     rc = process_sasl_response(zh, zh->input_buffer->buffer, zh->input_buffer->curr_offset);
@@ -4939,7 +4939,7 @@ int flush_send_queue(zhandle_t*zh, int timeout)
             int elapsed;
             struct timeval now;
             get_system_time(&now);
-            elapsed=calculate_interval(&started,&now);
+            elapsed=calculate_interval(&started,&now); // 是发送等待的超时，而不是连接请求响应的超时，异步的会检测超时，同步不会
             if (elapsed>timeout) {
                 rc = ZOPERATIONTIMEOUT;
                 break;
@@ -4976,8 +4976,8 @@ int flush_send_queue(zhandle_t*zh, int timeout)
         }
         // if the buffer has been sent successfully, remove it from the queue
         if (rc > 0)
-            remove_buffer(&zh->to_send);
-        get_system_time(&zh->last_send);
+            remove_buffer(&zh->to_send);   // ?
+        get_system_time(&zh->last_send);  // 
         rc = ZOK;
     }
     unlock_buffer_list(&zh->to_send);
